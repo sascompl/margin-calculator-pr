@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: WooCommerce Margin Calculator Pro
+ * Plugin Name: Margin Calculator Pro for WooCommerce
  * Plugin URI: https://wordpress.org/plugins/woocommerce-margin-calculator/
  * Description: Advanced margin calculation and management for WooCommerce products with Quick Edit, per-category thresholds, and detailed statistics
- * Version: 1.2.0
+ * Version: 1.4.0
  * Author: Sascom
  * Author URI: https://sascom.pl
  * License: GPL v2 or later
@@ -28,11 +28,19 @@ add_action( 'before_woocommerce_init', function () {
 } );
 
 // Check if WooCommerce is active
-if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) ) ) {
+if ( ! wcmc_is_woocommerce_active() ) {
 	add_action( 'admin_notices', function () {
-		echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'WooCommerce Margin Calculator Pro', 'margin-calculator-pro' ) . '</strong> ' . esc_html__( 'requires WooCommerce to be installed and active!', 'margin-calculator-pro' ) . '</p></div>';
+		echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'Margin Calculator Pro for WooCommerce', 'margin-calculator-pro' ) . '</strong> ' . esc_html__( 'requires WooCommerce to be installed and active!', 'margin-calculator-pro' ) . '</p></div>';
 	} );
 	return;
+}
+
+/**
+ * Check if WooCommerce is active.
+ */
+function wcmc_is_woocommerce_active() {
+	return in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ), true ) // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+		|| ( is_multisite() && array_key_exists( 'woocommerce/woocommerce.php', get_site_option( 'active_sitewide_plugins', array() ) ) );
 }
 
 class WC_Margin_Calculator_Pro {
@@ -72,7 +80,7 @@ class WC_Margin_Calculator_Pro {
 	}
 
 	public function __construct() {
-		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
+		// WordPress 4.6+ loads translations automatically from WordPress.org
 		$this->init_default_settings();
 
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
@@ -119,10 +127,6 @@ class WC_Margin_Calculator_Pro {
 
 	public function check_margin_on_variation_save( $variation_id, $i ) {
 		$this->enforce_minimum_margin( $variation_id );
-	}
-
-	public function load_textdomain() {
-		load_plugin_textdomain( 'margin-calculator-pro', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 	}
 
 	private function init_default_settings() {
@@ -223,14 +227,18 @@ class WC_Margin_Calculator_Pro {
 
 	public function save_purchase_price( $post_id ) {
 		if ( isset( $_POST['_purchase_price_net'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-			update_post_meta( $post_id, '_purchase_price_net', wc_clean( wp_unslash( $_POST['_purchase_price_net'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification
+			$raw   = wp_unslash( $_POST['_purchase_price_net'] ); // phpcs:ignore WordPress.Security.NonceVerification,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+			$price = wc_clean( sanitize_text_field( $raw ) );
+			update_post_meta( $post_id, '_purchase_price_net', $price );
 		}
 		$this->enforce_minimum_margin( $post_id );
 	}
 
 	public function save_purchase_price_variation( $variation_id, $i ) {
 		if ( isset( $_POST['_purchase_price_net'][ $i ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-			update_post_meta( $variation_id, '_purchase_price_net', wc_clean( wp_unslash( $_POST['_purchase_price_net'][ $i ] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification
+			$raw   = wp_unslash( $_POST['_purchase_price_net'][ $i ] ); // phpcs:ignore WordPress.Security.NonceVerification,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+			$price = wc_clean( sanitize_text_field( $raw ) );
+			update_post_meta( $variation_id, '_purchase_price_net', $price );
 		}
 		$this->enforce_minimum_margin( $variation_id );
 	}
@@ -512,7 +520,7 @@ class WC_Margin_Calculator_Pro {
 			wp_send_json_error( array( 'message' => esc_html__( 'Unauthorized', 'margin-calculator-pro' ) ), 403 );
 		}
 
-		$product_id     = intval( $_POST['product_id'] );
+		$product_id     = isset( $_POST['product_id'] ) ? intval( $_POST['product_id'] ) : 0;
 		$purchase_price = get_post_meta( $product_id, '_purchase_price_net', true );
 
 		wp_send_json_success( array( 'purchase_price' => $purchase_price ) );
@@ -552,9 +560,9 @@ class WC_Margin_Calculator_Pro {
 			}
 
 			$settings = array(
-				'margin_high'   => intval( $_POST['margin_high'] ),
-				'margin_medium' => intval( $_POST['margin_medium'] ),
-				'vat_rate'      => sanitize_text_field( wp_unslash( $_POST['vat_rate'] ) ),
+				'margin_high'   => isset( $_POST['margin_high'] ) ? intval( $_POST['margin_high'] ) : 40,
+				'margin_medium' => isset( $_POST['margin_medium'] ) ? intval( $_POST['margin_medium'] ) : 30,
+				'vat_rate'      => isset( $_POST['vat_rate'] ) ? sanitize_text_field( wp_unslash( $_POST['vat_rate'] ) ) : '23',
 			);
 
 			if ( $settings['margin_high'] < $settings['margin_medium'] ) {
@@ -714,19 +722,25 @@ class WC_Margin_Calculator_Pro {
 	private function display_statistics() {
 		global $wpdb;
 
-		$products = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT p.ID, pm1.meta_value as purchase_price, pm2.meta_value as sale_price
-				FROM {$wpdb->posts} p
-				LEFT JOIN {$wpdb->postmeta} pm1 ON p.ID = pm1.post_id AND pm1.meta_key = %s
-				LEFT JOIN {$wpdb->postmeta} pm2 ON p.ID = pm2.post_id AND pm2.meta_key = %s
-				WHERE p.post_type = %s AND p.post_status = %s",
-				'_purchase_price_net',
-				'_regular_price',
-				'product',
-				'publish'
-			)
-		);
+		$cache_key = 'wcmc_statistics_products';
+		$products  = wp_cache_get( $cache_key, 'wcmc' );
+
+		if ( false === $products ) {
+			$products = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				$wpdb->prepare(
+					"SELECT p.ID, pm1.meta_value as purchase_price, pm2.meta_value as sale_price
+					FROM {$wpdb->posts} p
+					LEFT JOIN {$wpdb->postmeta} pm1 ON p.ID = pm1.post_id AND pm1.meta_key = %s
+					LEFT JOIN {$wpdb->postmeta} pm2 ON p.ID = pm2.post_id AND pm2.meta_key = %s
+					WHERE p.post_type = %s AND p.post_status = %s",
+					'_purchase_price_net',
+					'_regular_price',
+					'product',
+					'publish'
+				)
+			);
+			wp_cache_set( $cache_key, $products, 'wcmc', 300 );
+		}
 
 		$total      = count( $products );
 		$with_margin = 0;
@@ -786,7 +800,7 @@ class WC_Margin_Calculator_Pro {
 		$products_data  = array();
 
 		// Simple products (instock only)
-		$simple_products = $wpdb->get_results(
+		$simple_products = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
 				"SELECT p.ID, p.post_title, pm1.meta_value as purchase_price, pm2.meta_value as sale_price
 				FROM {$wpdb->posts} p
@@ -825,7 +839,7 @@ class WC_Margin_Calculator_Pro {
 		}
 
 		// Variations (instock only)
-		$variations = $wpdb->get_results(
+		$variations = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
 				"SELECT v.ID, v.post_parent, v.post_title, pm1.meta_value as purchase_price, pm2.meta_value as sale_price,
 				       parent.post_title as parent_title
@@ -973,7 +987,7 @@ class WC_Margin_Calculator_Pro {
 
 		<?php
 		// Products WITHOUT purchase price (simple, instock only)
-		$without_purchase = $wpdb->get_results(
+		$without_purchase = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
 				"SELECT p.ID, p.post_title, pm_sku.meta_value as sku, pm_price.meta_value as price
 				FROM {$wpdb->posts} p
@@ -998,7 +1012,7 @@ class WC_Margin_Calculator_Pro {
 			)
 		);
 
-		$variations_without = $wpdb->get_results(
+		$variations_without = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
 				"SELECT v.ID, v.post_parent, parent.post_title as parent_title,
 				       pm_sku.meta_value as sku, pm_price.meta_value as price
@@ -1040,7 +1054,7 @@ class WC_Margin_Calculator_Pro {
 			);
 		}
 
-		$count_without = (int) $wpdb->get_var(
+		$count_without = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
 				"SELECT COUNT(*)
 				FROM {$wpdb->posts} p
@@ -1073,7 +1087,7 @@ class WC_Margin_Calculator_Pro {
 						$edit_link = $p['parent_id'] ? admin_url( 'post.php?post=' . $p['parent_id'] . '&action=edit' ) : admin_url( 'post.php?post=' . $p['id'] . '&action=edit' );
 						$hidden    = $index >= 10 ? 'style="display:none;" class="wcmc-hidden-row"' : '';
 					?>
-					<tr <?php echo $hidden; ?>>
+					<tr <?php echo $hidden ? 'style="display:none;" class="wcmc-hidden-row"' : ''; ?>>
 						<td><code><?php echo esc_html( $p['sku'] ); ?></code></td>
 						<td><a href="<?php echo esc_url( $edit_link ); ?>"><?php echo esc_html( mb_substr( $p['name'], 0, 30 ) ); ?></a></td>
 						<td><?php echo wp_kses_post( wc_price( $p['price'] ) ); ?></td>
@@ -1422,7 +1436,7 @@ class WC_Margin_Calculator_Pro {
 
 		global $wpdb;
 
-		$rows = $wpdb->get_results(
+		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
 				"SELECT p.ID, pm_sku.meta_value as sku, pm_purchase.meta_value as purchase_price, pm_price.meta_value as regular_price
 				FROM {$wpdb->posts} p
@@ -1441,19 +1455,24 @@ class WC_Margin_Calculator_Pro {
 		header( 'Pragma: no-cache' );
 		header( 'Expires: 0' );
 
-		$output = fopen( 'php://output', 'w' );
-		fputcsv( $output, array( 'product_id', 'sku', 'purchase_price', 'regular_price' ) );
+		// Build CSV using output buffering - no direct filesystem calls
+		ob_start();
+		$columns = array( 'product_id', 'sku', 'purchase_price', 'regular_price' );
+		echo esc_html( implode( ',', $columns ) ) . "\n";
 
 		foreach ( $rows as $row ) {
-			fputcsv( $output, array(
-				$row->ID,
-				$row->sku,
-				$row->purchase_price,
-				$row->regular_price,
-			) );
+			$line = array(
+				intval( $row->ID ),
+				'"' . str_replace( '"', '""', (string) $row->sku ) . '"',
+				'"' . str_replace( '"', '""', (string) $row->purchase_price ) . '"',
+				'"' . str_replace( '"', '""', (string) $row->regular_price ) . '"',
+			);
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			echo implode( ',', $line ) . "\n";
 		}
 
-		fclose( $output );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo ob_get_clean();
 		exit;
 	}
 

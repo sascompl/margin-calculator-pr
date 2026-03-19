@@ -20,7 +20,7 @@ msgstr ""
 "X-Domain: margin-calculator-pro\n"
 
 msgid "WooCommerce Margin Calculator Pro"
-msgstr "Kalkulator Marży WooCommerce Pro"
+msgstr "Kalkulator Marży Pro dla WooCommerce"
 
 msgid "requires WooCommerce to be installed and active!"
 msgstr "wymaga zainstalowanego i aktywnego WooCommerce!"
