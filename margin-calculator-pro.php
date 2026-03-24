@@ -3,7 +3,7 @@
  * Plugin Name: Margin Calculator Pro for WooCommerce
  * Plugin URI: https://wordpress.org/plugins/woocommerce-margin-calculator/
  * Description: Advanced margin calculation and management for WooCommerce products with Quick Edit, per-category thresholds, and detailed statistics
- * Version: 1.4.0
+ * Version: 1.5.0
  * Author: Sascom
  * Author URI: https://sascom.pl
  * License: GPL v2 or later
