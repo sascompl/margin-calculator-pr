@@ -1577,7 +1577,7 @@ class WC_Margin_Calculator_Pro {
 					<div class="wcmc-filter-group">
 						<label for="wcmc-year"><?php esc_html_e( 'Year', 'margin-calculator-pro' ); ?></label>
 						<select id="wcmc-year">
-							<?php for ( $y = $current_year; $y >= $current_year - 5; $y-- ) : ?>
+							<?php for ( $y = $current_year; $y >= 2025; $y-- ) : ?>
 								<option value="<?php echo esc_attr( $y ); ?>"><?php echo esc_html( $y ); ?></option>
 							<?php endfor; ?>
 						</select>
