@@ -28,7 +28,7 @@ add_action( 'before_woocommerce_init', function () {
 } );
 
 // Check if WooCommerce is active
-if ( ! wcmc_is_woocommerce_active() ) {
+if ( ! mcpro_is_woocommerce_active() ) {
 	add_action( 'admin_notices', function () {
 		echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'Margin Calculator Pro for WooCommerce', 'margin-calculator-pro' ) . '</strong> ' . esc_html__( 'requires WooCommerce to be installed and active!', 'margin-calculator-pro' ) . '</p></div>';
 	} );
@@ -38,12 +38,12 @@ if ( ! wcmc_is_woocommerce_active() ) {
 /**
  * Check if WooCommerce is active.
  */
-function wcmc_is_woocommerce_active() {
+function mcpro_is_woocommerce_active() {
 	return in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ), true ) // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
 		|| ( is_multisite() && array_key_exists( 'woocommerce/woocommerce.php', get_site_option( 'active_sitewide_plugins', array() ) ) );
 }
 
-class WC_Margin_Calculator_Pro {
+class Mcpro_Margin_Calculator {
 
 	private static $instance = null;
 
@@ -102,7 +102,7 @@ class WC_Margin_Calculator_Pro {
 		add_action( 'woocommerce_product_options_pricing', array( $this, 'display_margin_in_product' ), 30 );
 		add_action( 'woocommerce_variation_options_pricing', array( $this, 'display_margin_in_variation' ), 35, 3 );
 
-		add_action( 'wp_ajax_wcmc_get_purchase_price', array( $this, 'ajax_get_purchase_price' ) );
+		add_action( 'wp_ajax_mcpro_get_purchase_price', array( $this, 'ajax_get_purchase_price' ) );
 
 		add_action( 'wp_dashboard_setup', array( $this, 'add_dashboard_widget' ) );
 
@@ -117,11 +117,11 @@ class WC_Margin_Calculator_Pro {
 		add_action( 'manage_shop_order_posts_custom_column', array( $this, 'display_margin_order_column' ), 10, 2 );
 
 		// ── NEW: CSV Import ───────────────────────────────────────────────────
-		add_action( 'wp_ajax_wcmc_import_csv', array( $this, 'ajax_import_csv' ) );
-		add_action( 'wp_ajax_wcmc_export_csv', array( $this, 'ajax_export_csv' ) );
+		add_action( 'wp_ajax_mcpro_import_csv', array( $this, 'ajax_import_csv' ) );
+		add_action( 'wp_ajax_mcpro_export_csv', array( $this, 'ajax_export_csv' ) );
 
 		// ── NEW: Reports ─────────────────────────────────────────────────────
-		add_action( 'wp_ajax_wcmc_get_report', array( $this, 'ajax_get_report' ) );
+		add_action( 'wp_ajax_mcpro_get_report', array( $this, 'ajax_get_report' ) );
 	}
 
 	public function check_margin_on_save( $post_id ) {
@@ -133,8 +133,8 @@ class WC_Margin_Calculator_Pro {
 	}
 
 	private function init_default_settings() {
-		if ( get_option( 'wcmc_settings' ) === false ) {
-			update_option( 'wcmc_settings', array(
+		if ( get_option( 'mcpro_settings' ) === false ) {
+			update_option( 'mcpro_settings', array(
 				'margin_high'   => 40,
 				'margin_medium' => 30,
 				'vat_rate'      => 23,
@@ -156,16 +156,16 @@ class WC_Margin_Calculator_Pro {
 			esc_html__( 'Margin Reports', 'margin-calculator-pro' ),
 			esc_html__( 'Margin Reports', 'margin-calculator-pro' ),
 			'manage_woocommerce',
-			'wcmc-margin-reports',
+			'mcpro-margin-reports',
 			array( $this, 'reports_page' )
 		);
 	}
 
 	public function register_settings() {
-		register_setting( 'wcmc_settings_group', 'wcmc_settings', array(
+		register_setting( 'mcpro_settings_group', 'mcpro_settings', array(
 			'sanitize_callback' => array( $this, 'sanitize_settings' ),
 		) );
-		register_setting( 'wcmc_settings_group', 'wcmc_category_margins', array(
+		register_setting( 'mcpro_settings_group', 'mcpro_category_margins', array(
 			'sanitize_callback' => array( $this, 'sanitize_category_margins' ),
 		) );
 	}
@@ -194,29 +194,32 @@ class WC_Margin_Calculator_Pro {
 	}
 
 	public function enqueue_admin_scripts( $hook ) {
+		// Enqueue admin styles on all admin pages (dashboard widgets, product lists, settings, reports).
+		wp_enqueue_style( 'mcpro-admin-style', plugin_dir_url( __FILE__ ) . 'assets/admin-style.css', array(), '1.5.0' );
+
 		if ( 'edit.php' === $hook || 'post.php' === $hook || 'post-new.php' === $hook ) {
-			wp_enqueue_script( 'wcmc-admin', plugin_dir_url( __FILE__ ) . 'assets/admin.js', array( 'jquery' ), '1.0.2', true );
-			wp_localize_script( 'wcmc-admin', 'wcmc', array(
+			wp_enqueue_script( 'mcpro-admin', plugin_dir_url( __FILE__ ) . 'assets/admin.js', array( 'jquery' ), '1.0.2', true );
+			wp_localize_script( 'mcpro-admin', 'mcpro', array(
 				'ajax_url' => admin_url( 'admin-ajax.php' ),
-				'nonce'    => wp_create_nonce( 'wcmc_nonce' ),
+				'nonce'    => wp_create_nonce( 'mcpro_nonce' ),
 			) );
 		}
 
 		$page = isset( $_GET['page'] ) ? sanitize_key( $_GET['page'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 
 		if ( 'margin-calculator-pro' === $page ) {
-			wp_enqueue_script( 'wcmc-admin', plugin_dir_url( __FILE__ ) . 'assets/admin.js', array( 'jquery', 'jquery-ui-core' ), '1.0.2', true );
-			wp_localize_script( 'wcmc-admin', 'wcmc', array(
+			wp_enqueue_script( 'mcpro-admin', plugin_dir_url( __FILE__ ) . 'assets/admin.js', array( 'jquery', 'jquery-ui-core' ), '1.0.2', true );
+			wp_localize_script( 'mcpro-admin', 'mcpro', array(
 				'ajax_url' => admin_url( 'admin-ajax.php' ),
-				'nonce'    => wp_create_nonce( 'wcmc_nonce' ),
+				'nonce'    => wp_create_nonce( 'mcpro_nonce' ),
 			) );
 		}
 
-		if ( 'wcmc-margin-reports' === $page ) {
-			wp_enqueue_script( 'wcmc-reports', plugin_dir_url( __FILE__ ) . 'assets/reports.js', array( 'jquery' ), '1.0.0', true );
-			wp_localize_script( 'wcmc-reports', 'wcmc', array(
+		if ( 'mcpro-margin-reports' === $page ) {
+			wp_enqueue_script( 'mcpro-reports', plugin_dir_url( __FILE__ ) . 'assets/reports.js', array( 'jquery' ), '1.0.0', true );
+			wp_localize_script( 'mcpro-reports', 'mcpro', array(
 				'ajax_url' => admin_url( 'admin-ajax.php' ),
-				'nonce'    => wp_create_nonce( 'wcmc_nonce' ),
+				'nonce'    => wp_create_nonce( 'mcpro_nonce' ),
 			) );
 		}
 	}
@@ -282,7 +285,7 @@ class WC_Margin_Calculator_Pro {
 			return;
 		}
 
-		$settings       = get_option( 'wcmc_settings', array( 'vat_rate' => 23 ) );
+		$settings       = get_option( 'mcpro_settings', array( 'vat_rate' => 23 ) );
 		$vat_multiplier = 1 + ( floatval( $settings['vat_rate'] ) / 100 );
 
 		$min_sale_net   = $purchase_price / ( 1 - self::MIN_MARGIN );
@@ -295,7 +298,7 @@ class WC_Margin_Calculator_Pro {
 
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-				error_log( sprintf( 'WCMC: Auto-corrected price for product ID %d: %s -> %s (min margin: %s%%)', $product_id, $regular_price, $min_sale_gross, ( self::MIN_MARGIN * 100 ) ) );
+				error_log( sprintf( 'MCPRO: Auto-corrected price for product ID %d: %s -> %s (min margin: %s%%)', $product_id, $regular_price, $min_sale_gross, ( self::MIN_MARGIN * 100 ) ) );
 			}
 		}
 	}
@@ -325,7 +328,7 @@ class WC_Margin_Calculator_Pro {
 			return null;
 		}
 
-		$settings       = get_option( 'wcmc_settings', array( 'vat_rate' => 23 ) );
+		$settings       = get_option( 'mcpro_settings', array( 'vat_rate' => 23 ) );
 		$vat_multiplier = 1 + ( floatval( $settings['vat_rate'] ) / 100 );
 		$sale_price_net = $sale_price / $vat_multiplier;
 
@@ -343,11 +346,11 @@ class WC_Margin_Calculator_Pro {
 			return '#999';
 		}
 
-		$settings = get_option( 'wcmc_settings', array( 'margin_high' => 40, 'margin_medium' => 30 ) );
+		$settings = get_option( 'mcpro_settings', array( 'margin_high' => 40, 'margin_medium' => 30 ) );
 
 		if ( $product_id ) {
 			$categories      = wp_get_post_terms( $product_id, 'product_cat', array( 'fields' => 'ids' ) );
-			$category_margins = get_option( 'wcmc_category_margins', array() );
+			$category_margins = get_option( 'mcpro_category_margins', array() );
 
 			foreach ( $categories as $cat_id ) {
 				if ( isset( $category_margins[ $cat_id ] ) && ! empty( $category_margins[ $cat_id ]['high'] ) ) {
@@ -501,7 +504,7 @@ class WC_Margin_Calculator_Pro {
 				<label>
 					<span class="title"><?php esc_html_e( 'Purchase price (net)', 'margin-calculator-pro' ); ?></span>
 					<span class="input-text-wrap">
-						<input type="text" name="_purchase_price_net" class="text wc_input_price wcmc-purchase-price" value="" placeholder="0.00">
+						<input type="text" name="_purchase_price_net" class="text wc_input_price mcpro-purchase-price" value="" placeholder="0.00">
 					</span>
 				</label>
 			</div>
@@ -534,7 +537,7 @@ class WC_Margin_Calculator_Pro {
 
 	public function ajax_get_purchase_price() {
 		// Verify nonce
-		check_ajax_referer( 'wcmc_nonce', 'nonce' );
+		check_ajax_referer( 'mcpro_nonce', 'nonce' );
 
 		// Check capability
 		if ( ! current_user_can( 'edit_products' ) ) {
@@ -575,7 +578,7 @@ class WC_Margin_Calculator_Pro {
 	// ── SETTINGS PAGE ─────────────────────────────────────────────────────
 
 	public function settings_page() {
-		if ( isset( $_POST['wcmc_save_settings'] ) && check_admin_referer( 'wcmc_settings' ) ) {
+		if ( isset( $_POST['mcpro_save_settings'] ) && check_admin_referer( 'mcpro_settings' ) ) {
 			if ( ! current_user_can( 'manage_woocommerce' ) ) {
 				wp_die( esc_html__( 'You do not have permission to manage these settings.', 'margin-calculator-pro' ) );
 			}
@@ -589,7 +592,7 @@ class WC_Margin_Calculator_Pro {
 			if ( $settings['margin_high'] < $settings['margin_medium'] ) {
 				echo '<div class="notice notice-error"><p>' . esc_html__( 'High margin must be greater than medium margin!', 'margin-calculator-pro' ) . '</p></div>';
 			} else {
-				update_option( 'wcmc_settings', $settings );
+				update_option( 'mcpro_settings', $settings );
 
 				if ( isset( $_POST['category_margins'] ) && is_array( $_POST['category_margins'] ) ) {
 					$category_margins = array();
@@ -621,21 +624,21 @@ class WC_Margin_Calculator_Pro {
 						echo '<div class="notice notice-warning"><p><strong>' . esc_html__( 'Warnings:', 'margin-calculator-pro' ) . '</strong><br>' . implode( '<br>', array_map( 'esc_html', $errors ) ) . '</p></div>';
 					}
 
-					update_option( 'wcmc_category_margins', $category_margins );
+					update_option( 'mcpro_category_margins', $category_margins );
 				}
 
 				echo '<div class="notice notice-success"><p><strong>' . esc_html__( 'Success!', 'margin-calculator-pro' ) . '</strong> ' . esc_html__( 'Settings saved.', 'margin-calculator-pro' ) . '</p></div>';
 			}
 		}
 
-		$settings         = get_option( 'wcmc_settings', array( 'margin_high' => 40, 'margin_medium' => 30, 'vat_rate' => 23 ) );
-		$category_margins = get_option( 'wcmc_category_margins', array() );
+		$settings         = get_option( 'mcpro_settings', array( 'margin_high' => 40, 'margin_medium' => 30, 'vat_rate' => 23 ) );
+		$category_margins = get_option( 'mcpro_category_margins', array() );
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Margin Calculator - Settings', 'margin-calculator-pro' ); ?></h1>
 
 			<form method="post" action="">
-				<?php wp_nonce_field( 'wcmc_settings' ); ?>
+				<?php wp_nonce_field( 'mcpro_settings' ); ?>
 
 				<h2><?php esc_html_e( 'Global margin thresholds', 'margin-calculator-pro' ); ?></h2>
 				<table class="form-table">
@@ -715,7 +718,7 @@ class WC_Margin_Calculator_Pro {
 				<?php endif; ?>
 
 				<p class="submit">
-					<input type="submit" name="wcmc_save_settings" class="button button-primary" value="<?php esc_attr_e( 'Save settings', 'margin-calculator-pro' ); ?>">
+					<input type="submit" name="mcpro_save_settings" class="button button-primary" value="<?php esc_attr_e( 'Save settings', 'margin-calculator-pro' ); ?>">
 				</p>
 			</form>
 
@@ -743,8 +746,8 @@ class WC_Margin_Calculator_Pro {
 	private function display_statistics() {
 		global $wpdb;
 
-		$cache_key = 'wcmc_statistics_products';
-		$products  = wp_cache_get( $cache_key, 'wcmc' );
+		$cache_key = 'mcpro_statistics_products';
+		$products  = wp_cache_get( $cache_key, 'mcpro' );
 
 		if ( false === $products ) {
 			$products = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
@@ -760,7 +763,7 @@ class WC_Margin_Calculator_Pro {
 					'publish'
 				)
 			);
-			wp_cache_set( $cache_key, $products, 'wcmc', 300 );
+			wp_cache_set( $cache_key, $products, 'mcpro', 300 );
 		}
 
 		$total      = count( $products );
@@ -803,12 +806,12 @@ class WC_Margin_Calculator_Pro {
 
 	public function add_dashboard_widget() {
 		wp_add_dashboard_widget(
-			'wcmc_margin_widget',
+			'mcpro_margin_widget',
 			esc_html__( 'Product Margins', 'margin-calculator-pro' ),
 			array( $this, 'display_dashboard_widget' )
 		);
 		wp_add_dashboard_widget(
-			'wcmc_orders_widget',
+			'mcpro_orders_widget',
 			esc_html__( 'Order Margins - Current Month', 'margin-calculator-pro' ),
 			array( $this, 'display_orders_dashboard_widget' )
 		);
@@ -867,49 +870,40 @@ class WC_Margin_Calculator_Pro {
 		$margin_color = $avg_margin >= 30 ? '#4CAF50' : ( $avg_margin >= 15 ? '#FB8C00' : '#C62828' );
 		$profit_color = $total_profit >= 0 ? '#4CAF50' : '#C62828';
 		?>
-		<style>
-			.wcmc-ow-cards { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-			.wcmc-ow-card { flex: 1; min-width: 100px; background: #f9f9f9; border: 1px solid #e5e5e5; padding: 10px; text-align: center; border-radius: 4px; }
-			.wcmc-ow-card .wcmc-ow-label { font-size: 11px; color: #666; margin-bottom: 4px; }
-			.wcmc-ow-card .wcmc-ow-value { font-size: 18px; font-weight: 700; }
-			.wcmc-ow-extremes { display: flex; gap: 10px; }
-			.wcmc-ow-extremes > div { flex: 1; padding: 8px; background: #f9f9f9; border: 1px solid #e5e5e5; border-radius: 4px; font-size: 13px; }
-		</style>
-
 		<?php if ( 0 === $order_count ) : ?>
 			<p style="color:#999;"><?php esc_html_e( 'No orders with margin data this month.', 'margin-calculator-pro' ); ?></p>
 		<?php else : ?>
-			<div class="wcmc-ow-cards">
-				<div class="wcmc-ow-card">
-					<div class="wcmc-ow-label"><?php esc_html_e( 'Orders', 'margin-calculator-pro' ); ?></div>
-					<div class="wcmc-ow-value"><?php echo esc_html( $order_count ); ?></div>
+			<div class="mcpro-ow-cards">
+				<div class="mcpro-ow-card">
+					<div class="mcpro-ow-label"><?php esc_html_e( 'Orders', 'margin-calculator-pro' ); ?></div>
+					<div class="mcpro-ow-value"><?php echo esc_html( $order_count ); ?></div>
 				</div>
-				<div class="wcmc-ow-card">
-					<div class="wcmc-ow-label"><?php esc_html_e( 'Profit', 'margin-calculator-pro' ); ?></div>
-					<div class="wcmc-ow-value" style="color:<?php echo esc_attr( $profit_color ); ?>">
+				<div class="mcpro-ow-card">
+					<div class="mcpro-ow-label"><?php esc_html_e( 'Profit', 'margin-calculator-pro' ); ?></div>
+					<div class="mcpro-ow-value" style="color:<?php echo esc_attr( $profit_color ); ?>">
 						<?php echo wp_kses_post( wc_price( $total_profit ) ); ?>
 					</div>
 				</div>
-				<div class="wcmc-ow-card">
-					<div class="wcmc-ow-label"><?php esc_html_e( 'Average margin', 'margin-calculator-pro' ); ?></div>
-					<div class="wcmc-ow-value" style="color:<?php echo esc_attr( $margin_color ); ?>">
+				<div class="mcpro-ow-card">
+					<div class="mcpro-ow-label"><?php esc_html_e( 'Average margin', 'margin-calculator-pro' ); ?></div>
+					<div class="mcpro-ow-value" style="color:<?php echo esc_attr( $margin_color ); ?>">
 						<?php echo esc_html( $avg_margin ); ?>%
 					</div>
 				</div>
 			</div>
-			<div class="wcmc-ow-cards">
-				<div class="wcmc-ow-card">
-					<div class="wcmc-ow-label"><?php esc_html_e( 'Net revenue', 'margin-calculator-pro' ); ?></div>
-					<div class="wcmc-ow-value" style="font-size:14px;"><?php echo wp_kses_post( wc_price( $total_revenue ) ); ?></div>
+			<div class="mcpro-ow-cards">
+				<div class="mcpro-ow-card">
+					<div class="mcpro-ow-label"><?php esc_html_e( 'Net revenue', 'margin-calculator-pro' ); ?></div>
+					<div class="mcpro-ow-value" style="font-size:14px;"><?php echo wp_kses_post( wc_price( $total_revenue ) ); ?></div>
 				</div>
-				<div class="wcmc-ow-card">
-					<div class="wcmc-ow-label"><?php esc_html_e( 'Total cost', 'margin-calculator-pro' ); ?></div>
-					<div class="wcmc-ow-value" style="font-size:14px;"><?php echo wp_kses_post( wc_price( $total_cost ) ); ?></div>
+				<div class="mcpro-ow-card">
+					<div class="mcpro-ow-label"><?php esc_html_e( 'Total cost', 'margin-calculator-pro' ); ?></div>
+					<div class="mcpro-ow-value" style="font-size:14px;"><?php echo wp_kses_post( wc_price( $total_cost ) ); ?></div>
 				</div>
 			</div>
 
 			<?php if ( $lowest_order && $highest_order ) : ?>
-				<div class="wcmc-ow-extremes">
+				<div class="mcpro-ow-extremes">
 					<div>
 						<?php esc_html_e( 'Lowest', 'margin-calculator-pro' ); ?>:
 						<a href="<?php echo esc_url( $lowest_order['url'] ); ?>">
@@ -928,7 +922,7 @@ class WC_Margin_Calculator_Pro {
 			<?php endif; ?>
 
 			<p style="margin:10px 0 0; text-align:right;">
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wcmc-margin-reports' ) ); ?>">
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=mcpro-margin-reports' ) ); ?>">
 					<?php esc_html_e( 'View full report', 'margin-calculator-pro' ); ?> &rarr;
 				</a>
 			</p>
@@ -943,7 +937,7 @@ class WC_Margin_Calculator_Pro {
 			return;
 		}
 
-		$settings       = get_option( 'wcmc_settings', array( 'vat_rate' => 23 ) );
+		$settings       = get_option( 'mcpro_settings', array( 'vat_rate' => 23 ) );
 		$vat_multiplier = 1 + ( floatval( $settings['vat_rate'] ) / 100 );
 		$products_data  = array();
 
@@ -1045,43 +1039,28 @@ class WC_Margin_Calculator_Pro {
 		$min_margin = min( $margins );
 		$max_margin = max( $margins );
 		?>
-		<style>
-			.wcmc-widget-stats { display: flex; gap: 15px; margin-bottom: 15px; }
-			.wcmc-widget-stat { flex: 1; text-align: center; padding: 10px; background: #f0f0f1; border-radius: 4px; }
-			.wcmc-widget-stat strong { display: block; font-size: 24px; }
-			.wcmc-widget-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-			.wcmc-widget-table th, .wcmc-widget-table td { padding: 5px 8px; text-align: left; border-bottom: 1px solid #ddd; }
-			.wcmc-widget-table th { background: #f0f0f1; }
-			.wcmc-widget-section { margin-bottom: 15px; }
-			.wcmc-widget-section h4 { margin: 0 0 8px 0; font-size: 13px; }
-			.margin-low { color: #C62828; font-weight: bold; }
-			.margin-medium { color: #FB8C00; font-weight: bold; }
-			.margin-high { color: #4CAF50; font-weight: bold; }
-			.margin-very-high { color: #ee00ff; font-weight: bold; }
-		</style>
-
-		<div class="wcmc-widget-stats">
-			<div class="wcmc-widget-stat">
+		<div class="mcpro-widget-stats">
+			<div class="mcpro-widget-stat">
 				<strong><?php echo esc_html( count( $products_data ) ); ?></strong>
 				<span><?php esc_html_e( 'With purchase price', 'margin-calculator-pro' ); ?></span>
 			</div>
-			<div class="wcmc-widget-stat">
+			<div class="mcpro-widget-stat">
 				<strong><?php echo esc_html( $avg_margin ); ?>%</strong>
 				<span><?php esc_html_e( 'Average margin', 'margin-calculator-pro' ); ?></span>
 			</div>
-			<div class="wcmc-widget-stat">
+			<div class="mcpro-widget-stat">
 				<strong class="margin-low"><?php echo esc_html( $min_margin ); ?>%</strong>
 				<span><?php esc_html_e( 'Lowest', 'margin-calculator-pro' ); ?></span>
 			</div>
-			<div class="wcmc-widget-stat">
+			<div class="mcpro-widget-stat">
 				<strong class="margin-very-high"><?php echo esc_html( $max_margin ); ?>%</strong>
 				<span><?php esc_html_e( 'Highest', 'margin-calculator-pro' ); ?></span>
 			</div>
 		</div>
 
-		<div class="wcmc-widget-section">
+		<div class="mcpro-widget-section">
 			<h4>🔴 <?php esc_html_e( 'Lowest margins (TOP 10)', 'margin-calculator-pro' ); ?></h4>
-			<table class="wcmc-widget-table">
+			<table class="mcpro-widget-table">
 				<thead>
 					<tr>
 						<th><?php esc_html_e( 'Product', 'margin-calculator-pro' ); ?></th>
@@ -1106,9 +1085,9 @@ class WC_Margin_Calculator_Pro {
 			</table>
 		</div>
 
-		<div class="wcmc-widget-section">
+		<div class="mcpro-widget-section">
 			<h4>🟢 <?php esc_html_e( 'Highest margins (TOP 10)', 'margin-calculator-pro' ); ?></h4>
-			<table class="wcmc-widget-table">
+			<table class="mcpro-widget-table">
 				<thead>
 					<tr>
 						<th><?php esc_html_e( 'Product', 'margin-calculator-pro' ); ?></th>
@@ -1220,9 +1199,9 @@ class WC_Margin_Calculator_Pro {
 
 		if ( ! empty( $all_without ) ) :
 		?>
-		<div class="wcmc-widget-section" style="margin-top: 20px; padding-top: 15px; border-top: 2px solid #ddd;">
+		<div class="mcpro-widget-section" style="margin-top: 20px; padding-top: 15px; border-top: 2px solid #ddd;">
 			<h4>⚠️ <?php esc_html_e( 'Products WITHOUT purchase price', 'margin-calculator-pro' ); ?> (<?php echo esc_html( $count_without ); ?>)</h4>
-			<table class="wcmc-widget-table" id="wcmc-without-table">
+			<table class="mcpro-widget-table" id="mcpro-without-table">
 				<thead>
 					<tr>
 						<th><?php esc_html_e( 'SKU', 'margin-calculator-pro' ); ?></th>
@@ -1233,9 +1212,9 @@ class WC_Margin_Calculator_Pro {
 				<tbody>
 					<?php foreach ( $all_without as $index => $p ) :
 						$edit_link = $p['parent_id'] ? admin_url( 'post.php?post=' . $p['parent_id'] . '&action=edit' ) : admin_url( 'post.php?post=' . $p['id'] . '&action=edit' );
-						$hidden    = $index >= 10 ? 'style="display:none;" class="wcmc-hidden-row"' : '';
+						$hidden    = $index >= 10 ? 'style="display:none;" class="mcpro-hidden-row"' : '';
 					?>
-					<tr <?php echo $hidden ? 'style="display:none;" class="wcmc-hidden-row"' : ''; ?>>
+					<tr <?php echo $hidden ? 'style="display:none;" class="mcpro-hidden-row"' : ''; ?>>
 						<td><code><?php echo esc_html( $p['sku'] ); ?></code></td>
 						<td><a href="<?php echo esc_url( $edit_link ); ?>"><?php echo esc_html( mb_substr( $p['name'], 0, 30 ) ); ?></a></td>
 						<td><?php echo wp_kses_post( wc_price( $p['price'] ) ); ?></td>
@@ -1245,7 +1224,7 @@ class WC_Margin_Calculator_Pro {
 			</table>
 			<?php if ( $count_without > 10 ) : ?>
 			<p style="text-align: center; margin-top: 8px;">
-				<button type="button" id="wcmc-show-all" class="button" onclick="document.querySelectorAll('.wcmc-hidden-row').forEach(r => r.style.display = ''); this.style.display='none'; document.getElementById('wcmc-hide-all').style.display='inline-block';">
+				<button type="button" id="mcpro-show-all" class="button" onclick="document.querySelectorAll('.mcpro-hidden-row').forEach(r => r.style.display = ''); this.style.display='none'; document.getElementById('mcpro-hide-all').style.display='inline-block';">
 					<?php
 					echo esc_html(
 						sprintf(
@@ -1256,7 +1235,7 @@ class WC_Margin_Calculator_Pro {
 					);
 					?>
 				</button>
-				<button type="button" id="wcmc-hide-all" class="button" style="display:none;" onclick="document.querySelectorAll('.wcmc-hidden-row').forEach(r => r.style.display = 'none'); this.style.display='none'; document.getElementById('wcmc-show-all').style.display='inline-block';">
+				<button type="button" id="mcpro-hide-all" class="button" style="display:none;" onclick="document.querySelectorAll('.mcpro-hidden-row').forEach(r => r.style.display = 'none'); this.style.display='none'; document.getElementById('mcpro-show-all').style.display='inline-block';">
 					<?php esc_html_e( 'Collapse list', 'margin-calculator-pro' ); ?>
 				</button>
 			</p>
@@ -1272,7 +1251,7 @@ class WC_Margin_Calculator_Pro {
 	 * Calculate total margin for a WooCommerce order.
 	 */
 	public function calculate_order_margin( $order ) {
-		$settings       = get_option( 'wcmc_settings', array( 'vat_rate' => 23 ) );
+		$settings       = get_option( 'mcpro_settings', array( 'vat_rate' => 23 ) );
 		$vat_multiplier = 1 + ( floatval( $settings['vat_rate'] ) / 100 );
 
 		$total_revenue = 0;
@@ -1363,7 +1342,7 @@ class WC_Margin_Calculator_Pro {
 		foreach ( $columns as $key => $val ) {
 			$new[ $key ] = $val;
 			if ( 'order_total' === $key ) {
-				$new['wcmc_margin'] = esc_html__( 'Margin', 'margin-calculator-pro' );
+				$new['mcpro_margin'] = esc_html__( 'Margin', 'margin-calculator-pro' );
 			}
 		}
 		return $new;
@@ -1373,7 +1352,7 @@ class WC_Margin_Calculator_Pro {
 	 * Display margin in orders list column.
 	 */
 	public function display_margin_order_column( $column, $order_or_id ) {
-		if ( 'wcmc_margin' !== $column ) {
+		if ( 'mcpro_margin' !== $column ) {
 			return;
 		}
 
@@ -1404,14 +1383,14 @@ class WC_Margin_Calculator_Pro {
 	 */
 	public function render_csv_section() {
 		?>
-		<div class="wcmc-csv-section">
+		<div class="mcpro-csv-section">
 			<h2><?php esc_html_e( 'Import / Export purchase prices (CSV)', 'margin-calculator-pro' ); ?></h2>
 
 			<h3><?php esc_html_e( 'Export', 'margin-calculator-pro' ); ?></h3>
 			<p class="description"><?php esc_html_e( 'Download all products with their purchase prices as a CSV file.', 'margin-calculator-pro' ); ?></p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>">
-				<?php wp_nonce_field( 'wcmc_export_csv', 'wcmc_nonce' ); ?>
-				<input type="hidden" name="action" value="wcmc_export_csv">
+				<?php wp_nonce_field( 'mcpro_export_csv', 'mcpro_nonce' ); ?>
+				<input type="hidden" name="action" value="mcpro_export_csv">
 				<button type="submit" class="button button-secondary">
 					⬇ <?php esc_html_e( 'Export CSV', 'margin-calculator-pro' ); ?>
 				</button>
@@ -1422,69 +1401,69 @@ class WC_Margin_Calculator_Pro {
 				<?php esc_html_e( 'Upload a CSV file with columns:', 'margin-calculator-pro' ); ?>
 				<code>sku, purchase_price</code> <?php esc_html_e( 'or', 'margin-calculator-pro' ); ?> <code>product_id, purchase_price</code>
 			</p>
-			<div id="wcmc-import-form">
-				<input type="file" id="wcmc-csv-file" accept=".csv" style="margin-bottom:8px;display:block;">
-				<button type="button" class="button button-primary" id="wcmc-import-btn">
+			<div id="mcpro-import-form">
+				<input type="file" id="mcpro-csv-file" accept=".csv" style="margin-bottom:8px;display:block;">
+				<button type="button" class="button button-primary" id="mcpro-import-btn">
 					⬆ <?php esc_html_e( 'Import CSV', 'margin-calculator-pro' ); ?>
 				</button>
-				<span id="wcmc-import-status" style="margin-left:12px;font-family:monospace;font-size:13px;"></span>
+				<span id="mcpro-import-status" style="margin-left:12px;font-family:monospace;font-size:13px;"></span>
 			</div>
 
-			<div id="wcmc-import-results" style="display:none;margin-top:1rem;">
+			<div id="mcpro-import-results" style="display:none;margin-top:1rem;">
 				<h4><?php esc_html_e( 'Import results', 'margin-calculator-pro' ); ?></h4>
-				<div id="wcmc-import-log" style="background:#f9f9f9;border:1px solid #ddd;padding:12px;max-height:200px;overflow-y:auto;font-family:monospace;font-size:12px;"></div>
+				<div id="mcpro-import-log" style="background:#f9f9f9;border:1px solid #ddd;padding:12px;max-height:200px;overflow-y:auto;font-family:monospace;font-size:12px;"></div>
 			</div>
 		</div>
 
-		<script>
+		<?php
+		$inline_js = "
 		jQuery(document).ready(function($){
-			$('#wcmc-import-btn').on('click', function(){
-				var file = $('#wcmc-csv-file')[0].files[0];
-				if(!file){ alert('<?php echo esc_js( __( 'Please select a CSV file.', 'margin-calculator-pro' ) ); ?>'); return; }
+			$('#mcpro-import-btn').on('click', function(){
+				var file = $('#mcpro-csv-file')[0].files[0];
+				if(!file){ alert('" . esc_js( __( 'Please select a CSV file.', 'margin-calculator-pro' ) ) . "'); return; }
 
 				var reader = new FileReader();
 				reader.onload = function(e){
 					var csv = e.target.result;
-					$('#wcmc-import-status').text('<?php echo esc_js( __( 'Importing...', 'margin-calculator-pro' ) ); ?>');
-					$('#wcmc-import-btn').prop('disabled', true);
+					$('#mcpro-import-status').text('" . esc_js( __( 'Importing...', 'margin-calculator-pro' ) ) . "');
+					$('#mcpro-import-btn').prop('disabled', true);
 
 					$.ajax({
-						url: wcmc.ajax_url,
+						url: mcpro.ajax_url,
 						type: 'POST',
 						data: {
-							action: 'wcmc_import_csv',
-							nonce: wcmc.nonce,
+							action: 'mcpro_import_csv',
+							nonce: mcpro.nonce,
 							csv_data: csv
 						},
 						success: function(response){
-							$('#wcmc-import-btn').prop('disabled', false);
+							$('#mcpro-import-btn').prop('disabled', false);
 							if(response.success){
-								$('#wcmc-import-status').css('color','#4CAF50').text('✓ ' + response.data.message);
-								$('#wcmc-import-results').show();
-								var log = response.data.log.join('\n');
-								$('#wcmc-import-log').text(log);
+								$('#mcpro-import-status').css('color','#4CAF50').text('" . "\u2713" . " ' + response.data.message);
+								$('#mcpro-import-results').show();
+								var log = response.data.log.join('\\n');
+								$('#mcpro-import-log').text(log);
 							} else {
-								$('#wcmc-import-status').css('color','#C62828').text('✗ ' + response.data.message);
+								$('#mcpro-import-status').css('color','#C62828').text('" . "\u2717" . " ' + response.data.message);
 							}
 						},
 						error: function(){
-							$('#wcmc-import-btn').prop('disabled', false);
-							$('#wcmc-import-status').css('color','#C62828').text('<?php echo esc_js( __( 'Connection error.', 'margin-calculator-pro' ) ); ?>');
+							$('#mcpro-import-btn').prop('disabled', false);
+							$('#mcpro-import-status').css('color','#C62828').text('" . esc_js( __( 'Connection error.', 'margin-calculator-pro' ) ) . "');
 						}
 					});
 				};
 				reader.readAsText(file);
 			});
-		});
-		</script>
-		<?php
+		});";
+		wp_add_inline_script( 'mcpro-admin', $inline_js );
 	}
 
 	/**
 	 * AJAX: Import CSV.
 	 */
 	public function ajax_import_csv() {
-		check_ajax_referer( 'wcmc_nonce', 'nonce' );
+		check_ajax_referer( 'mcpro_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
 			wp_send_json_error( array( 'message' => esc_html__( 'Unauthorized', 'margin-calculator-pro' ) ), 403 );
@@ -1574,7 +1553,7 @@ class WC_Margin_Calculator_Pro {
 	 * AJAX: Export CSV.
 	 */
 	public function ajax_export_csv() {
-		if ( ! isset( $_POST['wcmc_nonce'] ) || ! wp_verify_nonce( sanitize_key( $_POST['wcmc_nonce'] ), 'wcmc_export_csv' ) ) {
+		if ( ! isset( $_POST['mcpro_nonce'] ) || ! wp_verify_nonce( sanitize_key( $_POST['mcpro_nonce'] ), 'mcpro_export_csv' ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'margin-calculator-pro' ) );
 		}
 
@@ -1655,105 +1634,79 @@ class WC_Margin_Calculator_Pro {
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Margin Reports', 'margin-calculator-pro' ); ?></h1>
 
-			<style>
-				.wcmc-report-filters { background: #fff; padding: 15px 20px; border: 1px solid #ccd0d4; margin-bottom: 20px; }
-				.wcmc-filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-				.wcmc-filter-row label { font-weight: 600; font-size: 13px; }
-				.wcmc-filter-separator { color: #ccd0d4; font-size: 18px; margin: 0 2px; }
-				.wcmc-quick-filter.active { background: #2271b1; color: #fff; border-color: #2271b1; }
-				.wcmc-summary-cards { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
-				.wcmc-card { background: #fff; border: 1px solid #ccd0d4; padding: 15px 20px; min-width: 180px; flex: 1; }
-				.wcmc-card h3 { margin: 0 0 5px; font-size: 13px; color: #666; font-weight: normal; }
-				.wcmc-card .wcmc-card-value { font-size: 24px; font-weight: 700; }
-				.wcmc-card .wcmc-card-value.positive { color: #4CAF50; }
-				.wcmc-card .wcmc-card-value.negative { color: #C62828; }
-				.wcmc-card .wcmc-card-value.neutral { color: #333; }
-				.wcmc-report-table { width: 100%; border-collapse: collapse; background: #fff; }
-				.wcmc-report-table th { background: #f0f0f1; padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #ccd0d4; }
-				.wcmc-sortable { cursor: pointer; user-select: none; }
-				.wcmc-sortable:hover { background: #e5e5e5; }
-				.wcmc-sortable::after { content: '\25B2\25BC'; font-size: 9px; margin-left: 5px; color: #999; letter-spacing: -2px; }
-				.wcmc-sortable.wcmc-sort-asc::after { content: '\25B2'; color: #2271b1; letter-spacing: 0; }
-				.wcmc-sortable.wcmc-sort-desc::after { content: '\25BC'; color: #2271b1; letter-spacing: 0; }
-				.wcmc-report-table td { padding: 10px 12px; border-bottom: 1px solid #f0f0f1; }
-				.wcmc-report-table tr:hover td { background: #f9f9f9; }
-				#wcmc-report-loading { display: none; padding: 20px; text-align: center; color: #666; }
-				#wcmc-report-empty { display: none; padding: 20px; text-align: center; color: #999; background: #fff; border: 1px solid #ccd0d4; }
-			</style>
-
-			<div class="wcmc-report-filters">
-				<div class="wcmc-filter-row">
-					<button type="button" class="button wcmc-quick-filter" data-filter="current_month">
+			<div class="mcpro-report-filters">
+				<div class="mcpro-filter-row">
+					<button type="button" class="button mcpro-quick-filter" data-filter="current_month">
 						<?php esc_html_e( 'Current month', 'margin-calculator-pro' ); ?>
 					</button>
-					<button type="button" class="button wcmc-quick-filter" data-filter="previous_month">
+					<button type="button" class="button mcpro-quick-filter" data-filter="previous_month">
 						<?php esc_html_e( 'Previous month', 'margin-calculator-pro' ); ?>
 					</button>
 
-					<span class="wcmc-filter-separator">|</span>
+					<span class="mcpro-filter-separator">|</span>
 
-					<select id="wcmc-month">
+					<select id="mcpro-month">
 						<?php foreach ( $months as $num => $name ) : ?>
 							<option value="<?php echo esc_attr( $num ); ?>" <?php selected( $num, $current_month ); ?>>
 								<?php echo esc_html( $name ); ?>
 							</option>
 						<?php endforeach; ?>
 					</select>
-					<select id="wcmc-year">
+					<select id="mcpro-year">
 						<?php for ( $y = $current_year; $y >= 2026; $y-- ) : ?>
 							<option value="<?php echo esc_attr( $y ); ?>"><?php echo esc_html( $y ); ?></option>
 						<?php endfor; ?>
 					</select>
-					<button type="button" class="button button-primary" id="wcmc-apply-month">
+					<button type="button" class="button button-primary" id="mcpro-apply-month">
 						<?php esc_html_e( 'Show', 'margin-calculator-pro' ); ?>
 					</button>
 
-					<span class="wcmc-filter-separator">|</span>
+					<span class="mcpro-filter-separator">|</span>
 
-					<label for="wcmc-date-from"><?php esc_html_e( 'From', 'margin-calculator-pro' ); ?></label>
-					<input type="date" id="wcmc-date-from" value="<?php echo esc_attr( gmdate( 'Y-m-01' ) ); ?>">
-					<label for="wcmc-date-to"><?php esc_html_e( 'To', 'margin-calculator-pro' ); ?></label>
-					<input type="date" id="wcmc-date-to" value="<?php echo esc_attr( gmdate( 'Y-m-d' ) ); ?>">
-					<button type="button" class="button button-primary" id="wcmc-apply-range">
+					<label for="mcpro-date-from"><?php esc_html_e( 'From', 'margin-calculator-pro' ); ?></label>
+					<input type="date" id="mcpro-date-from" value="<?php echo esc_attr( gmdate( 'Y-m-01' ) ); ?>">
+					<label for="mcpro-date-to"><?php esc_html_e( 'To', 'margin-calculator-pro' ); ?></label>
+					<input type="date" id="mcpro-date-to" value="<?php echo esc_attr( gmdate( 'Y-m-d' ) ); ?>">
+					<button type="button" class="button button-primary" id="mcpro-apply-range">
 						<?php esc_html_e( 'Show', 'margin-calculator-pro' ); ?>
 					</button>
 				</div>
 			</div>
 
-			<div id="wcmc-report-loading">
+			<div id="mcpro-report-loading">
 				<span class="spinner is-active" style="float:none;"></span>
 				<?php esc_html_e( 'Loading report...', 'margin-calculator-pro' ); ?>
 			</div>
 
-			<div id="wcmc-report-empty">
+			<div id="mcpro-report-empty">
 				<?php esc_html_e( 'No orders found for the selected period.', 'margin-calculator-pro' ); ?>
 			</div>
 
-			<div id="wcmc-report-results" style="display:none;">
-				<div class="wcmc-summary-cards">
-					<div class="wcmc-card">
+			<div id="mcpro-report-results" style="display:none;">
+				<div class="mcpro-summary-cards">
+					<div class="mcpro-card">
 						<h3><?php esc_html_e( 'Orders', 'margin-calculator-pro' ); ?></h3>
-						<div class="wcmc-card-value neutral" id="wcmc-total-orders">0</div>
+						<div class="mcpro-card-value neutral" id="mcpro-total-orders">0</div>
 					</div>
-					<div class="wcmc-card">
+					<div class="mcpro-card">
 						<h3><?php esc_html_e( 'Net revenue', 'margin-calculator-pro' ); ?></h3>
-						<div class="wcmc-card-value neutral" id="wcmc-total-revenue">0</div>
+						<div class="mcpro-card-value neutral" id="mcpro-total-revenue">0</div>
 					</div>
-					<div class="wcmc-card">
+					<div class="mcpro-card">
 						<h3><?php esc_html_e( 'Total cost', 'margin-calculator-pro' ); ?></h3>
-						<div class="wcmc-card-value neutral" id="wcmc-total-cost">0</div>
+						<div class="mcpro-card-value neutral" id="mcpro-total-cost">0</div>
 					</div>
-					<div class="wcmc-card">
+					<div class="mcpro-card">
 						<h3><?php esc_html_e( 'Profit', 'margin-calculator-pro' ); ?></h3>
-						<div class="wcmc-card-value" id="wcmc-total-profit">0</div>
+						<div class="mcpro-card-value" id="mcpro-total-profit">0</div>
 					</div>
-					<div class="wcmc-card">
+					<div class="mcpro-card">
 						<h3><?php esc_html_e( 'Average margin', 'margin-calculator-pro' ); ?></h3>
-						<div class="wcmc-card-value" id="wcmc-avg-margin">0%</div>
+						<div class="mcpro-card-value" id="mcpro-avg-margin">0%</div>
 					</div>
 				</div>
 
-				<table class="wcmc-report-table">
+				<table class="mcpro-report-table">
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Order', 'margin-calculator-pro' ); ?></th>
@@ -1761,11 +1714,11 @@ class WC_Margin_Calculator_Pro {
 							<th><?php esc_html_e( 'Customer', 'margin-calculator-pro' ); ?></th>
 							<th><?php esc_html_e( 'Net revenue', 'margin-calculator-pro' ); ?></th>
 							<th><?php esc_html_e( 'Cost', 'margin-calculator-pro' ); ?></th>
-							<th class="wcmc-sortable" data-sort="profit"><?php esc_html_e( 'Profit', 'margin-calculator-pro' ); ?></th>
-							<th class="wcmc-sortable" data-sort="margin"><?php esc_html_e( 'Margin', 'margin-calculator-pro' ); ?></th>
+							<th class="mcpro-sortable" data-sort="profit"><?php esc_html_e( 'Profit', 'margin-calculator-pro' ); ?></th>
+							<th class="mcpro-sortable" data-sort="margin"><?php esc_html_e( 'Margin', 'margin-calculator-pro' ); ?></th>
 						</tr>
 					</thead>
-					<tbody id="wcmc-report-tbody"></tbody>
+					<tbody id="mcpro-report-tbody"></tbody>
 				</table>
 			</div>
 		</div>
@@ -1776,7 +1729,7 @@ class WC_Margin_Calculator_Pro {
 	 * AJAX handler for margin reports.
 	 */
 	public function ajax_get_report() {
-		check_ajax_referer( 'wcmc_nonce', 'nonce' );
+		check_ajax_referer( 'mcpro_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
 			wp_send_json_error( 'Unauthorized' );
@@ -1885,8 +1838,8 @@ class WC_Margin_Calculator_Pro {
 	}
 }
 
-function wcmc_init() {
-	return WC_Margin_Calculator_Pro::instance();
+function mcpro_init() {
+	return Mcpro_Margin_Calculator::instance();
 }
 
-add_action( 'plugins_loaded', 'wcmc_init' );
+add_action( 'plugins_loaded', 'mcpro_init' );

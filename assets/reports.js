@@ -17,7 +17,7 @@ jQuery(document).ready(function ($) {
 	}
 
 	function renderRows(orders, sym) {
-		var $tbody = $('#wcmc-report-tbody').empty()
+		var $tbody = $('#mcpro-report-tbody').empty()
 
 		$.each(orders, function (i, row) {
 			var marginCell, profitCell
@@ -92,43 +92,43 @@ jQuery(document).ready(function ($) {
 		})
 
 		// Update sort indicators
-		$('.wcmc-sortable').removeClass('wcmc-sort-asc wcmc-sort-desc')
-		$('.wcmc-sortable[data-sort="' + key + '"]').addClass(
-			currentSort.dir === 'desc' ? 'wcmc-sort-desc' : 'wcmc-sort-asc'
+		$('.mcpro-sortable').removeClass('mcpro-sort-asc mcpro-sort-desc')
+		$('.mcpro-sortable[data-sort="' + key + '"]').addClass(
+			currentSort.dir === 'desc' ? 'mcpro-sort-desc' : 'mcpro-sort-asc'
 		)
 
 		renderRows(reportData, reportCurrency)
 	}
 
 	function loadReport(dateFrom, dateTo) {
-		$('#wcmc-report-results').hide()
-		$('#wcmc-report-empty').hide()
-		$('#wcmc-report-loading').show()
+		$('#mcpro-report-results').hide()
+		$('#mcpro-report-empty').hide()
+		$('#mcpro-report-loading').show()
 		reportData = null
 		currentSort = { key: null, dir: 'desc' }
-		$('.wcmc-sortable').removeClass('wcmc-sort-asc wcmc-sort-desc')
+		$('.mcpro-sortable').removeClass('mcpro-sort-asc mcpro-sort-desc')
 
 		$.ajax({
-			url: wcmc.ajax_url,
+			url: mcpro.ajax_url,
 			type: 'POST',
 			data: {
-				action: 'wcmc_get_report',
-				nonce: wcmc.nonce,
+				action: 'mcpro_get_report',
+				nonce: mcpro.nonce,
 				date_from: dateFrom,
 				date_to: dateTo,
 			},
 			success: function (response) {
-				$('#wcmc-report-loading').hide()
+				$('#mcpro-report-loading').hide()
 
 				if (!response.success) {
-					$('#wcmc-report-empty')
+					$('#mcpro-report-empty')
 						.text(response.data || 'Error loading report.')
 						.show()
 					return
 				}
 
 				if (response.data.total_orders === 0) {
-					$('#wcmc-report-empty').show()
+					$('#mcpro-report-empty').show()
 					return
 				}
 
@@ -138,28 +138,28 @@ jQuery(document).ready(function ($) {
 				reportData = d.orders
 				reportCurrency = sym
 
-				$('#wcmc-total-orders').text(d.total_orders)
-				$('#wcmc-total-revenue').text(formatMoney(d.total_revenue, sym))
-				$('#wcmc-total-cost').text(formatMoney(d.total_cost, sym))
+				$('#mcpro-total-orders').text(d.total_orders)
+				$('#mcpro-total-revenue').text(formatMoney(d.total_revenue, sym))
+				$('#mcpro-total-cost').text(formatMoney(d.total_cost, sym))
 
-				var $profit = $('#wcmc-total-profit')
+				var $profit = $('#mcpro-total-profit')
 				$profit
 					.text(formatMoney(d.total_profit, sym))
 					.removeClass('positive negative')
 					.addClass(d.total_profit >= 0 ? 'positive' : 'negative')
 
-				var $margin = $('#wcmc-avg-margin')
+				var $margin = $('#mcpro-avg-margin')
 				$margin
 					.text(d.avg_margin + '%')
 					.removeClass('positive negative')
 					.addClass(d.avg_margin >= 0 ? 'positive' : 'negative')
 
 				renderRows(reportData, sym)
-				$('#wcmc-report-results').show()
+				$('#mcpro-report-results').show()
 			},
 			error: function (xhr, status, error) {
-				$('#wcmc-report-loading').hide()
-				$('#wcmc-report-empty')
+				$('#mcpro-report-loading').hide()
+				$('#mcpro-report-empty')
 					.text('Error: ' + (error || 'Connection failed'))
 					.show()
 			},
@@ -167,7 +167,7 @@ jQuery(document).ready(function ($) {
 	}
 
 	// Sort on header click
-	$(document).on('click', '.wcmc-sortable', function () {
+	$(document).on('click', '.mcpro-sortable', function () {
 		sortOrders($(this).data('sort'))
 	})
 
@@ -184,24 +184,24 @@ jQuery(document).ready(function ($) {
 	}
 
 	// Quick filter: current month
-	$('.wcmc-quick-filter[data-filter="current_month"]').on('click', function () {
-		$('.wcmc-quick-filter').removeClass('active')
+	$('.mcpro-quick-filter[data-filter="current_month"]').on('click', function () {
+		$('.mcpro-quick-filter').removeClass('active')
 		$(this).addClass('active')
 
 		var now = new Date()
 		var range = getMonthRange(now.getFullYear(), now.getMonth() + 1)
 
-		$('#wcmc-date-from').val(range.from)
-		$('#wcmc-date-to').val(range.to)
-		$('#wcmc-month').val(now.getMonth() + 1)
-		$('#wcmc-year').val(now.getFullYear())
+		$('#mcpro-date-from').val(range.from)
+		$('#mcpro-date-to').val(range.to)
+		$('#mcpro-month').val(now.getMonth() + 1)
+		$('#mcpro-year').val(now.getFullYear())
 
 		loadReport(range.from, range.to)
 	})
 
 	// Quick filter: previous month
-	$('.wcmc-quick-filter[data-filter="previous_month"]').on('click', function () {
-		$('.wcmc-quick-filter').removeClass('active')
+	$('.mcpro-quick-filter[data-filter="previous_month"]').on('click', function () {
+		$('.mcpro-quick-filter').removeClass('active')
 		$(this).addClass('active')
 
 		var now = new Date()
@@ -214,34 +214,34 @@ jQuery(document).ready(function ($) {
 
 		var range = getMonthRange(prevYear, prevMonth)
 
-		$('#wcmc-date-from').val(range.from)
-		$('#wcmc-date-to').val(range.to)
-		$('#wcmc-month').val(prevMonth)
-		$('#wcmc-year').val(prevYear)
+		$('#mcpro-date-from').val(range.from)
+		$('#mcpro-date-to').val(range.to)
+		$('#mcpro-month').val(prevMonth)
+		$('#mcpro-year').val(prevYear)
 
 		loadReport(range.from, range.to)
 	})
 
 	// Apply month + year
-	$('#wcmc-apply-month').on('click', function () {
-		$('.wcmc-quick-filter').removeClass('active')
+	$('#mcpro-apply-month').on('click', function () {
+		$('.mcpro-quick-filter').removeClass('active')
 
-		var month = parseInt($('#wcmc-month').val())
-		var year = parseInt($('#wcmc-year').val())
+		var month = parseInt($('#mcpro-month').val())
+		var year = parseInt($('#mcpro-year').val())
 		var range = getMonthRange(year, month)
 
-		$('#wcmc-date-from').val(range.from)
-		$('#wcmc-date-to').val(range.to)
+		$('#mcpro-date-from').val(range.from)
+		$('#mcpro-date-to').val(range.to)
 
 		loadReport(range.from, range.to)
 	})
 
 	// Apply custom date range
-	$('#wcmc-apply-range').on('click', function () {
-		$('.wcmc-quick-filter').removeClass('active')
+	$('#mcpro-apply-range').on('click', function () {
+		$('.mcpro-quick-filter').removeClass('active')
 
-		var from = $('#wcmc-date-from').val()
-		var to = $('#wcmc-date-to').val()
+		var from = $('#mcpro-date-from').val()
+		var to = $('#mcpro-date-to').val()
 
 		if (!from || !to) {
 			alert('Please select both dates.')
@@ -257,5 +257,5 @@ jQuery(document).ready(function ($) {
 	})
 
 	// Auto-load current month on page load
-	$('.wcmc-quick-filter[data-filter="current_month"]').trigger('click')
+	$('.mcpro-quick-filter[data-filter="current_month"]').trigger('click')
 })

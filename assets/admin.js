@@ -16,12 +16,12 @@ jQuery(document).ready(function ($) {
 
 			// Pobierz cenę zakupu przez AJAX
 			$.ajax({
-				url: wcmc.ajax_url,
+				url: mcpro.ajax_url,
 				type: 'POST',
 				data: {
-					action: 'wcmc_get_purchase_price',
+					action: 'mcpro_get_purchase_price',
 					product_id: postId,
-					nonce: wcmc.nonce,
+					nonce: mcpro.nonce,
 				},
 				success: function (response) {
 					if (response.success && response.data.purchase_price) {
@@ -37,7 +37,7 @@ jQuery(document).ready(function ($) {
 					}
 				},
 				error: function () {
-					console.log('WCMC: Error loading purchase price')
+					console.log('MCPRO: Error loading purchase price')
 				},
 			})
 		}
@@ -54,7 +54,7 @@ jQuery(document).ready(function ($) {
 	})
 
 	// TOGGLE VARIATIONS LIST (rozwijana lista wariantów)
-	$(document).on('click', '.wcmc-toggle-variations', function (e) {
+	$(document).on('click', '.mcpro-toggle-variations', function (e) {
 		e.preventDefault()
 		var targetId = $(this).data('target')
 		var $list = $('#' + targetId)
@@ -73,7 +73,7 @@ jQuery(document).ready(function ($) {
 	if ($('input[name="margin_high"]').length) {
 		var $marginHigh = $('input[name="margin_high"]')
 		var $marginMedium = $('input[name="margin_medium"]')
-		var $submitButton = $('input[name="wcmc_save_settings"]')
+		var $submitButton = $('input[name="mcpro_save_settings"]')
 		var $validationMessage = $(
 			'<div class="notice notice-warning inline" style="margin: 10px 0; padding: 10px; display: none;"><p></p></div>'
 		)

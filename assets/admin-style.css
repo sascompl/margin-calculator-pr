@@ -1,0 +1,46 @@
+/* Orders dashboard widget */
+.mcpro-ow-cards { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.mcpro-ow-card { flex: 1; min-width: 100px; background: #f9f9f9; border: 1px solid #e5e5e5; padding: 10px; text-align: center; border-radius: 4px; }
+.mcpro-ow-card .mcpro-ow-label { font-size: 11px; color: #666; margin-bottom: 4px; }
+.mcpro-ow-card .mcpro-ow-value { font-size: 18px; font-weight: 700; }
+.mcpro-ow-extremes { display: flex; gap: 10px; }
+.mcpro-ow-extremes > div { flex: 1; padding: 8px; background: #f9f9f9; border: 1px solid #e5e5e5; border-radius: 4px; font-size: 13px; }
+
+/* Products dashboard widget */
+.mcpro-widget-stats { display: flex; gap: 15px; margin-bottom: 15px; }
+.mcpro-widget-stat { flex: 1; text-align: center; padding: 10px; background: #f0f0f1; border-radius: 4px; }
+.mcpro-widget-stat strong { display: block; font-size: 24px; }
+.mcpro-widget-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mcpro-widget-table th, .mcpro-widget-table td { padding: 5px 8px; text-align: left; border-bottom: 1px solid #ddd; }
+.mcpro-widget-table th { background: #f0f0f1; }
+.mcpro-widget-section { margin-bottom: 15px; }
+.mcpro-widget-section h4 { margin: 0 0 8px 0; font-size: 13px; }
+.margin-low { color: #C62828; font-weight: bold; }
+.margin-medium { color: #FB8C00; font-weight: bold; }
+.margin-high { color: #4CAF50; font-weight: bold; }
+.margin-very-high { color: #ee00ff; font-weight: bold; }
+
+/* Reports page */
+.mcpro-report-filters { background: #fff; padding: 15px 20px; border: 1px solid #ccd0d4; margin-bottom: 20px; }
+.mcpro-filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.mcpro-filter-row label { font-weight: 600; font-size: 13px; }
+.mcpro-filter-separator { color: #ccd0d4; font-size: 18px; margin: 0 2px; }
+.mcpro-quick-filter.active { background: #2271b1; color: #fff; border-color: #2271b1; }
+.mcpro-summary-cards { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+.mcpro-card { background: #fff; border: 1px solid #ccd0d4; padding: 15px 20px; min-width: 180px; flex: 1; }
+.mcpro-card h3 { margin: 0 0 5px; font-size: 13px; color: #666; font-weight: normal; }
+.mcpro-card .mcpro-card-value { font-size: 24px; font-weight: 700; }
+.mcpro-card .mcpro-card-value.positive { color: #4CAF50; }
+.mcpro-card .mcpro-card-value.negative { color: #C62828; }
+.mcpro-card .mcpro-card-value.neutral { color: #333; }
+.mcpro-report-table { width: 100%; border-collapse: collapse; background: #fff; }
+.mcpro-report-table th { background: #f0f0f1; padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #ccd0d4; }
+.mcpro-sortable { cursor: pointer; user-select: none; }
+.mcpro-sortable:hover { background: #e5e5e5; }
+.mcpro-sortable::after { content: '\25B2\25BC'; font-size: 9px; margin-left: 5px; color: #999; letter-spacing: -2px; }
+.mcpro-sortable.mcpro-sort-asc::after { content: '\25B2'; color: #2271b1; letter-spacing: 0; }
+.mcpro-sortable.mcpro-sort-desc::after { content: '\25BC'; color: #2271b1; letter-spacing: 0; }
+.mcpro-report-table td { padding: 10px 12px; border-bottom: 1px solid #f0f0f1; }
+.mcpro-report-table tr:hover td { background: #f9f9f9; }
+#mcpro-report-loading { display: none; padding: 20px; text-align: center; color: #666; }
+#mcpro-report-empty { display: none; padding: 20px; text-align: center; color: #999; background: #fff; border: 1px solid #ccd0d4; }
